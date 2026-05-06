@@ -1,0 +1,28 @@
+"""
+配置模块
+"""
+from .settings import (
+    BASE_URL,
+    JOB_LIST_URL,
+    SEARCH_CONFIG,
+    DEFAULT_HEADERS,
+    LOCATION_MAPPING,
+    EDUCATION_MAPPING,
+    MAJOR_KEYWORDS,
+    TIME_RANGE_CONFIG,
+    LOG_CONFIG,
+    JOB_TYPE_MAPPING,
+)
+
+__all__ = [
+    "BASE_URL",
+    "JOB_LIST_URL",
+    "SEARCH_CONFIG",
+    "DEFAULT_HEADERS",
+    "LOCATION_MAPPING",
+    "EDUCATION_MAPPING",
+    "MAJOR_KEYWORDS",
+    "TIME_RANGE_CONFIG",
+    "LOG_CONFIG",
+    "JOB_TYPE_MAPPING",
+]
