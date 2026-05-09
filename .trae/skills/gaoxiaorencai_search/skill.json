@@ -1,0 +1,32 @@
+{
+  "name": "gaoxiaorencai_search",
+  "description": "Search and retrieve job postings from gaoxiaojob.com (高校人才网). Invoke when user wants to find university/research institute job openings, faculty positions, postdoc opportunities, or when user asks about academic job search in China.",
+  "version": "1.0.0",
+  "author": "OpenClaw",
+  "type": "python",
+  "entry": "__init__.py",
+  "functions": [
+    {
+      "name": "search",
+      "description": "Search for job postings on gaoxiaojob.com",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query string in format: 地区，学历，专业方向，时效范围 (e.g., '北京，硕士，AI方向，近1个月')"
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ],
+  "dependencies": [
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "pydantic>=2.0.0",
+    "python-dateutil>=2.8.0",
+    "fake-useragent>=1.4.0"
+  ]
+}

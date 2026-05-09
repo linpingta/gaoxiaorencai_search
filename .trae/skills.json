@@ -1,0 +1,10 @@
+{
+  "skills": [
+    {
+      "name": "gaoxiaorencai_search",
+      "path": ".trae/skills/gaoxiaorencai_search",
+      "enabled": true,
+      "auto_load": true
+    }
+  ]
+}
