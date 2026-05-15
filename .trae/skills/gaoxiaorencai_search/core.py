@@ -167,8 +167,14 @@ class SearchEngine:
                 response = self.session.get(url, params=params, timeout=self.timeout)
                 response.raise_for_status()
                 
-                if "验证码" in response.text or "captcha" in response.text.lower():
+                # 检查是否需要验证码（但"验证码"可能只是登录表单的一部分）
+                if "captcha.qcloud.com" in response.text.lower() or "安全验证" in response.text:
                     logger.warning("需要验证码")
+                    return None
+                
+                # 检查是否是有效的职位列表页面
+                if len(response.text) < 5000 or "职位" not in response.text:
+                    logger.warning("响应内容异常，可能是反爬限制")
                     return None
                 
                 return response.text
@@ -235,8 +241,21 @@ class ResultFormatter:
         
         return "\n".join(lines)
     
-    def _format_empty(self, criteria_desc: str) -> str:
+    def _format_empty(self, criteria_desc: str, is_access_error: bool = False) -> str:
         """格式化空结果"""
+        if is_access_error:
+            return f"""【高校人才网-实时搜索结果】（筛选条件：{criteria_desc}）
+
+暂时无法访问高校人才网，可能原因：
+1. 网站访问频率限制，请稍后重试
+2. 需要验证码验证
+3. 网络连接问题
+
+建议：
+1. 等待几分钟后重试
+2. 直接访问官网查看：https://www.gaoxiaojob.com
+3. 调整搜索条件后重试"""
+
         return f"""【高校人才网-实时搜索结果】（筛选条件：{criteria_desc}）
 
 未找到符合条件的招聘信息，建议：
@@ -303,7 +322,8 @@ class SearchService:
             )
             
             if html is None:
-                return "当前高校人才网访问异常，请稍后重试"
+                # 访问失败，返回友好的错误提示
+                return self.formatter._format_empty(criteria_desc, is_access_error=True)
             
             jobs = self.job_parser.parse_job_list(html)
             total = len(jobs)
@@ -314,8 +334,11 @@ class SearchService:
             jobs = self.job_parser.deduplicate_jobs(jobs)
             jobs = self.job_parser.sort_jobs(jobs)
             
+            if not jobs:
+                return self.formatter._format_empty(criteria_desc, is_access_error=False)
+            
             return self.formatter.format(jobs, criteria_desc, total)
             
         except Exception as e:
             logger.exception("搜索异常")
-            return f"搜索失败: {str(e)}"
+            return f"搜索失败: {str(e)}\n\n建议直接访问官网查看：https://www.gaoxiaojob.com"
