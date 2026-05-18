@@ -1,63 +1,84 @@
-# 高校人才网实时搜索
+# 高校人才网实时搜索 Skill
 
-基于实时搜索方案的高校人才网(gaoxiaojob.com)招聘信息获取工具，支持按地区、学历、专业方向等多条件筛选。
+基于实时API搜索方案的高校人才网(gaoxiaojob.com)招聘信息获取工具，支持按地区、学历、专业方向等多条件筛选。
 
 ## 功能特性
 
-- **实时搜索**：按需触发搜索，无需长期爬虫运行
+- **实时搜索**：通过官方API实时获取最新招聘信息
 - **多条件筛选**：支持地区、学历、专业方向、时效范围组合筛选
 - **智能解析**：自动解析用户输入，支持模糊匹配
-- **结果格式化**：支持文本、Markdown、JSON等多种输出格式
-- **OpenClaw Skill**：提供标准化Skill接口，便于集成
+- **结果格式化**：结构化的职位信息输出
+- **OpenClaw Skill**：提供标准化Skill接口，便于集成到AI助手
 
-## 安装
+## 项目结构
+
+```
+gaoxiaorencai_search/
+├── .trae/
+│   └── skills/
+│       └── gaoxiaorencai_search/   # Skill核心代码
+│           ├── __init__.py         # Skill入口
+│           ├── core.py             # 搜索引擎和查询解析
+│           ├── parsers.py          # 数据解析
+│           ├── utils.py            # 工具函数
+│           └── skill.json          # Skill配置
+├── test_skill_local.py             # 本地测试脚本
+├── requirements.txt                # 依赖列表
+└── README.md                       # 项目说明
+```
+
+## 安装依赖
 
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd gaoxiaorencai_search
-
-# 安装依赖
 pip install -r requirements.txt
 ```
 
+依赖包：
+- requests
+- beautifulsoup4
+
 ## 使用方法
 
-### 命令行使用
+### 1. 作为OpenClaw Skill使用
+
+在支持OpenClaw Skill的AI助手中，直接调用：
+
+```
+北京，硕士，AI方向，近1个月
+```
+
+或获取帮助：
+
+```
+help
+```
+
+### 2. Python API调用
+
+```python
+import sys
+import os
+
+# 添加skill目录到路径
+skill_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.trae', 'skills', 'gaoxiaorencai_search')
+sys.path.insert(0, skill_dir)
+
+from core import SearchService
+
+# 创建搜索服务
+service = SearchService()
+
+# 执行搜索
+result = service.search("北京，硕士，AI方向，近1个月")
+print(result)
+```
+
+### 3. 命令行测试
+
+运行本地测试脚本：
 
 ```bash
-# 单次搜索
-python main.py "北京，硕士，AI方向，近1个月"
-
-# 交互模式
-python main.py -i
-
-# 显示详细日志
-python main.py "北京，硕士，AI方向" -v
-```
-
-### Python API
-
-```python
-from gaoxiaorencai_search import search
-
-# 执行搜索
-result = search("北京，硕士，AI方向，近1个月")
-print(result)
-```
-
-### OpenClaw Skill
-
-```python
-from gaoxiaorencai_search import skill
-
-# 执行搜索
-result = skill.run("北京，硕士，AI方向，近1个月")
-print(result)
-
-# 获取帮助
-help_text = skill.help()
-print(help_text)
+python test_skill_local.py
 ```
 
 ## 查询语法
@@ -68,65 +89,115 @@ print(help_text)
 
 | 参数 | 示例 | 说明 |
 |------|------|------|
-| 地区 | 北京、上海、广州、深圳 | 支持主要城市 |
+| 地区 | 北京、上海、广州、深圳、杭州 | 支持主要城市 |
 | 学历 | 本科、硕士、博士、博士后 | 学历要求 |
 | 专业方向 | AI、计算机、自动化、教育 | 专业关键词 |
-| 时效范围 | 近7天、近1个月、近3个月 | 发布时间范围 |
+| 时效范围 | 近7天、近1个月、近3个月 | 发布时间范围，默认近1个月 |
 
-### 示例
+### 搜索示例
 
 ```
 北京，硕士，AI方向，近1个月
 上海，博士，计算机，近7天
 广州，本科，教育类，近3个月
 深圳，硕士，近1个月
+北京，教师
+上海，博士后
 ```
 
-## 项目结构
+## 本地验证
+
+### 方式一：运行测试脚本
+
+```bash
+python test_skill_local.py
+```
+
+测试脚本会执行多个搜索查询并显示结果，您可以修改脚本中的 `test_queries` 列表来测试不同的搜索条件。
+
+### 方式二：交互式测试
+
+创建测试文件 `my_test.py`：
+
+```python
+import sys
+import os
+
+skill_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.trae', 'skills', 'gaoxiaorencai_search')
+sys.path.insert(0, skill_dir)
+
+from core import SearchService
+
+service = SearchService()
+
+# 测试单个查询
+result = service.search("北京，硕士")
+print(result)
+```
+
+运行：
+
+```bash
+python my_test.py
+```
+
+### 验证要点
+
+1. **数据真实性**：检查结果中是否包含真实的大学/学院名称（如：上海科技大学、北京交通大学等）
+2. **链接有效性**：职位详情链接应为 `https://www.gaoxiaojob.com/job/detail/xxx.html` 格式
+3. **信息完整性**：每个职位应包含标题、单位、地点、学历、发布时间等信息
+
+## 输出示例
 
 ```
-gaoxiaorencai_search/
-├── config/             # 配置文件
-│   ├── __init__.py
-│   └── settings.py     # 配置参数
-├── core/               # 核心模块
-│   ├── __init__.py
-│   ├── search_engine.py    # 搜索引擎
-│   ├── query_parser.py     # 查询解析
-│   ├── formatter.py        # 结果格式化
-│   └── search_service.py   # 搜索服务
-├── parsers/            # 解析模块
-│   ├── __init__.py
-│   └── job_parser.py   # 职位解析
-├── utils/              # 工具模块
-│   ├── __init__.py
-│   └── logger.py       # 日志工具
-├── tests/              # 测试模块
-│   ├── __init__.py
-│   ├── test_query_parser.py
-│   └── test_job_parser.py
-├── skill.py            # OpenClaw Skill封装
-├── main.py             # 命令行入口
-├── requirements.txt    # 依赖列表
-└── README.md           # 项目说明
+【高校人才网-实时搜索结果】（筛选条件：北京，硕士，近1个月）
+
+共找到 15 条招聘信息，显示前 15 条：
+
+1. 【急聘】工作人员-国际合作与交流处
+   招聘单位：中国农业大学国际合作与交流处（双一流院校）
+   工作地点：北京-北京
+   学历要求：硕士研究生
+   专业方向：专业不限
+   招聘人数：1
+   发布时间：2026-05-13
+   薪资待遇：面议
+   详情链接：https://www.gaoxiaojob.com/job/detail/2168794.html
+
+2. 教学管理岗
+   招聘单位：南京航空航天大学教师发展与教学评估中心（双一流院校）
+   工作地点：江苏-南京
+   学历要求：硕士研究生
+   ...
 ```
 
 ## 配置说明
 
-在 `config/settings.py` 中可以修改以下配置：
+在 `.trae/skills/gaoxiaorencai_search/utils.py` 中可以修改以下配置：
 
-- `SEARCH_CONFIG`: 搜索参数（超时时间、重试次数等）
-- `LOCATION_MAPPING`: 地区映射
+- `LOCATION_MAPPING`: 地区映射（添加更多城市）
 - `EDUCATION_MAPPING`: 学历映射
 - `MAJOR_KEYWORDS`: 专业方向关键词
 - `TIME_RANGE_CONFIG`: 时效范围配置
-- `LOG_CONFIG`: 日志配置
+- `SEARCH_CONFIG`: 搜索参数（超时时间、重试次数、请求间隔等）
 
 ## 注意事项
 
-1. 请合理控制搜索频率，避免对目标网站造成压力
-2. 搜索结果仅供参考，请以高校人才网官网信息为准
-3. 如遇验证码或访问限制，请稍后重试
+1. **请求频率**：skill内置了请求间隔限制（默认10秒），请合理控制搜索频率
+2. **网络连接**：需要能够访问 `https://www.gaoxiaojob.com`
+3. **数据时效**：搜索结果为实时获取，与官网同步
+4. **结果数量**：每次搜索最多返回50条结果
+
+## 常见问题
+
+**Q: 搜索返回"暂时无法访问"？**  
+A: 可能是网络问题或请求过于频繁，请稍后重试。
+
+**Q: 搜索返回"未找到符合条件的招聘信息"？**  
+A: 尝试放宽搜索条件，如扩大时间范围、更换关键词等。
+
+**Q: 如何添加更多城市支持？**  
+A: 在 `utils.py` 的 `LOCATION_MAPPING` 中添加城市名称和对应的代码。
 
 ## 许可证
 
