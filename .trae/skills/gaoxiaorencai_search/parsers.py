@@ -3,7 +3,7 @@
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from bs4 import BeautifulSoup
 
@@ -31,8 +31,101 @@ class JobInfo:
 class JobParser:
     """职位信息解析器"""
     
+    def parse_api_response(self, data: Dict[str, Any]) -> List[JobInfo]:
+        """解析API返回的JSON数据"""
+        jobs = []
+        
+        if not data or not isinstance(data, dict):
+            logger.warning("API数据为空或格式错误")
+            return jobs
+        
+        # 获取职位列表
+        job_list = data.get("list", [])
+        
+        if not job_list:
+            logger.warning("API返回的职位列表为空")
+            return jobs
+        
+        logger.info(f"API返回 {len(job_list)} 个职位")
+        
+        for item in job_list:
+            try:
+                job = self._parse_api_job_item(item)
+                if job and job.title:
+                    jobs.append(job)
+            except Exception as e:
+                logger.warning(f"解析API职位项失败: {e}")
+                continue
+        
+        logger.info(f"成功解析 {len(jobs)} 个职位")
+        return jobs
+    
+    def _parse_api_job_item(self, item: Dict[str, Any]) -> Optional[JobInfo]:
+        """解析API返回的单个职位项"""
+        try:
+            # 提取职位名称
+            title = item.get("jobName", "").strip()
+            if not title:
+                return None
+            
+            # 提取公司名称
+            company = item.get("companyName", "未公开").strip()
+            
+            # 提取公司类型
+            company_type = item.get("companyTypeName", "未公开")
+            
+            # 提取地点
+            location = item.get("areaName", item.get("city", "未公开"))
+            
+            # 提取学历要求
+            education = item.get("education", "未公开")
+            
+            # 提取专业方向
+            major = item.get("jobRecord", "未公开")
+            
+            # 提取发布时间
+            publish_date = item.get("releaseTime", "")
+            if publish_date:
+                publish_date = normalize_date(publish_date)
+            
+            # 提取薪资
+            salary = item.get("wage", "面议")
+            
+            # 提取招聘人数
+            recruit_num = item.get("amount", "未公开")
+            
+            # 提取详情链接
+            url = item.get("url", "")
+            if url and not url.startswith("http"):
+                url = f"https://www.gaoxiaojob.com{url}"
+            
+            # 判断是否为急聘 (isTop=1表示置顶，可能是急聘)
+            is_urgent = item.get("isTop") == "1" or item.get("isFast") == "1"
+            
+            # 判断是否有编制 (isEstablishment=1表示有编制)
+            has_bianzhi = item.get("isEstablishment") == "1"
+            
+            return JobInfo(
+                title=title,
+                company=company,
+                company_type=company_type,
+                location=location,
+                education=education,
+                major=major,
+                publish_date=publish_date,
+                salary=salary,
+                benefits="未公开",  # API中似乎没有直接的福利字段
+                url=url,
+                recruit_num=recruit_num,
+                is_urgent=is_urgent,
+                has_bianzhi=has_bianzhi
+            )
+        except Exception as e:
+            logger.warning(f"解析API职位项异常: {e}")
+            return None
+    
     def parse_job_list(self, html: str) -> List[JobInfo]:
-        """解析职位列表页面"""
+        """解析职位列表页面 (HTML方式，保留用于兼容)"""
         if not html:
             return []
         
@@ -72,7 +165,7 @@ class JobParser:
         return jobs
     
     def _parse_job_item(self, item) -> Optional[JobInfo]:
-        """解析单个职位项"""
+        """解析单个职位项 (HTML方式)"""
         try:
             # 提取职位名称
             title = self._extract_text(item, [".job-title", ".title", "h3", "h4", "a"])

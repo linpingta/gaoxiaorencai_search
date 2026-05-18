@@ -122,9 +122,10 @@ class QueryParser:
 
 
 class SearchEngine:
-    """搜索引擎"""
+    """搜索引擎 - 使用API获取数据"""
     
     BASE_URL = "https://www.gaoxiaojob.com"
+    API_ENDPOINT = "/job/home-list"
     
     def __init__(self):
         self.session = requests.Session()
@@ -132,52 +133,93 @@ class SearchEngine:
         self.max_retries = SEARCH_CONFIG["max_retries"]
         self.retry_delay = SEARCH_CONFIG["retry_delay"]
         self._last_request_time = 0
+        self._initialized = False
         
         # 设置请求头
         self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": "https://www.gaoxiaojob.com",
+            "Referer": "https://www.gaoxiaojob.com/job",
+            "X-Requested-With": "XMLHttpRequest",
         })
+    
+    def _init_session(self):
+        """初始化session，访问首页获取cookie"""
+        if self._initialized:
+            return True
+        
+        try:
+            logger.info("初始化session，访问首页...")
+            resp = self.session.get(f"{self.BASE_URL}/job", timeout=self.timeout)
+            if resp.status_code == 200:
+                self._initialized = True
+                logger.info(f"Session初始化成功，cookies: {self.session.cookies.get_dict()}")
+                return True
+            else:
+                logger.warning(f"首页访问失败: {resp.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"初始化session失败: {e}")
+            return False
     
     def _wait_rate_limit(self):
         """等待请求间隔"""
         min_interval = SEARCH_CONFIG["request_delay"]
         elapsed = time.time() - self._last_request_time
         if elapsed < min_interval:
-            time.sleep(min_interval - elapsed + random.uniform(0.5, 1.5))
+            sleep_time = min_interval - elapsed + random.uniform(0.5, 1.5)
+            logger.info(f"等待 {sleep_time:.1f} 秒...")
+            time.sleep(sleep_time)
         self._last_request_time = time.time()
     
-    def search(self, keyword: str, location: str = "", education: str = "", page: int = 1) -> Optional[str]:
-        """执行搜索"""
+    def search(self, keyword: str = "", location: str = "", education: str = "", page: int = 1, page_size: int = 50) -> Optional[Dict[str, Any]]:
+        """执行搜索，返回JSON数据"""
         self._wait_rate_limit()
         
-        url = f"{self.BASE_URL}/job"
-        params = {"keyword": keyword, "page": page}
+        # 确保session已初始化
+        if not self._init_session():
+            logger.error("Session初始化失败")
+            return None
+        
+        # 构建请求参数
+        params = {
+            "page": page,
+            "pageSize": page_size,
+        }
+        
+        if keyword:
+            params["keyword"] = keyword
         
         if location and location in LOCATION_MAPPING:
             params["workplace"] = LOCATION_MAPPING[location]
         
         if education and education in EDUCATION_MAPPING:
-            params["degree"] = EDUCATION_MAPPING[education]
+            params["education"] = EDUCATION_MAPPING[education]
+        
+        url = f"{self.BASE_URL}{self.API_ENDPOINT}"
         
         for attempt in range(self.max_retries + 1):
             try:
-                logger.info(f"搜索: {url}, 参数: {params}")
-                response = self.session.get(url, params=params, timeout=self.timeout)
+                logger.info(f"搜索API: {url}, 参数: {params}")
+                response = self.session.post(url, data=params, timeout=self.timeout)
                 response.raise_for_status()
                 
-                # 检查是否需要验证码（但"验证码"可能只是登录表单的一部分）
-                if "captcha.qcloud.com" in response.text.lower() or "安全验证" in response.text:
-                    logger.warning("需要验证码")
-                    return None
+                # 解析JSON响应
+                data = response.json()
                 
-                # 检查是否是有效的职位列表页面
-                if len(response.text) < 5000 or "职位" not in response.text:
-                    logger.warning("响应内容异常，可能是反爬限制")
-                    return None
-                
-                return response.text
+                # 检查响应状态
+                if data.get("result") == 1:
+                    logger.info(f"搜索成功，获取到数据")
+                    return data.get("data", {})
+                else:
+                    logger.warning(f"API返回错误: {data.get('msg', '未知错误')}")
+                    if attempt < self.max_retries:
+                        time.sleep(self.retry_delay)
+                    else:
+                        return None
                 
             except requests.exceptions.Timeout:
                 logger.warning(f"超时，重试 {attempt + 1}/{self.max_retries}")
@@ -187,6 +229,9 @@ class SearchEngine:
                 logger.error(f"请求异常: {e}")
                 if attempt < self.max_retries:
                     time.sleep(self.retry_delay)
+            except ValueError as e:
+                logger.error(f"JSON解析失败: {e}")
+                return None
         
         return None
 
@@ -248,8 +293,7 @@ class ResultFormatter:
 
 暂时无法访问高校人才网，可能原因：
 1. 网站访问频率限制，请稍后重试
-2. 需要验证码验证
-3. 网络连接问题
+2. 网络连接问题
 
 建议：
 1. 等待几分钟后重试
@@ -286,17 +330,21 @@ class SearchService:
         if not criteria.is_valid():
             return []
         
-        html = self.engine.search(
+        # 调用API获取数据
+        data = self.engine.search(
             keyword=criteria.keyword,
             location=criteria.location,
-            education=criteria.education
+            education=criteria.education,
+            page_size=50
         )
         
-        if html is None:
+        if data is None:
             return []
         
-        jobs = self.job_parser.parse_job_list(html)
+        # 解析职位列表
+        jobs = self.job_parser.parse_api_response(data)
         
+        # 应用筛选条件
         if criteria.major:
             jobs = self.job_parser.filter_by_major(jobs, criteria.major)
         jobs = self.job_parser.filter_by_time_range(jobs, criteria.time_range)
@@ -315,19 +363,23 @@ class SearchService:
             criteria_desc = self.parser.format_criteria(criteria)
             logger.info(f"搜索: {criteria_desc}")
             
-            html = self.engine.search(
+            # 调用API
+            data = self.engine.search(
                 keyword=criteria.keyword,
                 location=criteria.location,
-                education=criteria.education
+                education=criteria.education,
+                page_size=50
             )
             
-            if html is None:
+            if data is None:
                 # 访问失败，返回友好的错误提示
                 return self.formatter._format_empty(criteria_desc, is_access_error=True)
             
-            jobs = self.job_parser.parse_job_list(html)
+            # 解析职位列表
+            jobs = self.job_parser.parse_api_response(data)
             total = len(jobs)
             
+            # 应用筛选条件
             if criteria.major:
                 jobs = self.job_parser.filter_by_major(jobs, criteria.major)
             jobs = self.job_parser.filter_by_time_range(jobs, criteria.time_range)
