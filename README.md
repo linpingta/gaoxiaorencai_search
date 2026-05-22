@@ -21,27 +21,71 @@ gaoxiaorencai_search/
 │           ├── core.py             # 搜索引擎和查询解析
 │           ├── parsers.py          # 数据解析
 │           ├── utils.py            # 工具函数
-│           └── skill.json          # Skill配置
+│           ├── skill.json          # Skill配置
+│           └── SKILL.md            # Skill说明文档
+├── install_skill.ps1               # Skill安装脚本
 ├── test_skill_local.py             # 本地测试脚本
 ├── requirements.txt                # 依赖列表
 └── README.md                       # 项目说明
 ```
 
-## 安装依赖
+## 安装到 OpenClaw/Trae
 
-```bash
-pip install -r requirements.txt
+### 方法一：使用 PowerShell 安装脚本（推荐）
+
+1. 打开 PowerShell，切换到项目目录
+2. 运行安装脚本：
+
+```powershell
+cd c:\Users\tchu\PycharmProjects\gaoxiaorencai_search
+.\install_skill.ps1
 ```
 
-依赖包：
-- requests
-- beautifulsoup4
+安装脚本会自动：
+- 将skill文件复制到 `~\.trae\skills\gaoxiaorencai_search`
+- 创建/更新 `~\.trae\skills.json` 配置文件
+- 验证安装是否成功
+
+### 方法二：手动安装
+
+如果脚本无法运行，可以手动复制：
+
+```powershell
+# 1. 创建目标目录
+mkdir -Force ~\.trae\skills
+
+# 2. 复制skill文件
+Copy-Item -Path ".trae\skills\gaoxiaorencai_search" -Destination "~\.trae\skills\" -Recurse -Force
+
+# 3. 创建 skills.json 配置文件
+$config = @{
+    skills = @(
+        @{
+            name = "gaoxiaorencai_search"
+            path = ".trae/skills/gaoxiaorencai_search"
+            enabled = $true
+            auto_load = $true
+        }
+    )
+}
+$config | ConvertTo-Json -Depth 10 | Set-Content -Path "~\.trae\skills.json" -Encoding UTF8
+```
+
+### 安装后使用
+
+1. **重启 Trae IDE**（完全关闭后重新打开）
+2. 在AI助手中直接输入搜索查询，例如：
+   - `北京，硕士，AI方向，近1个月`
+   - `上海，博士，计算机`
+   - `广州，本科，教师`
+
+AI助手会自动识别并调用这个skill来获取实时招聘信息。
 
 ## 使用方法
 
-### 1. 作为OpenClaw Skill使用
+### 1. 作为 OpenClaw Skill 使用
 
-在支持OpenClaw Skill的AI助手中，直接调用：
+安装到OpenClaw后，在AI助手中直接输入搜索条件：
 
 ```
 北京，硕士，AI方向，近1个月
@@ -53,7 +97,7 @@ pip install -r requirements.txt
 help
 ```
 
-### 2. Python API调用
+### 2. Python API 调用
 
 ```python
 import sys
@@ -73,7 +117,7 @@ result = service.search("北京，硕士，AI方向，近1个月")
 print(result)
 ```
 
-### 3. 命令行测试
+### 3. 命令行本地测试
 
 运行本地测试脚本：
 
@@ -171,6 +215,16 @@ python my_test.py
    ...
 ```
 
+## 安装依赖（用于本地开发/测试）
+
+```bash
+pip install -r requirements.txt
+```
+
+依赖包：
+- requests
+- beautifulsoup4
+
 ## 配置说明
 
 在 `.trae/skills/gaoxiaorencai_search/utils.py` 中可以修改以下配置：
@@ -187,8 +241,12 @@ python my_test.py
 2. **网络连接**：需要能够访问 `https://www.gaoxiaojob.com`
 3. **数据时效**：搜索结果为实时获取，与官网同步
 4. **结果数量**：每次搜索最多返回50条结果
+5. **安装位置**：OpenClaw Skill需要安装在 `~\.trae\skills\` 目录下
 
 ## 常见问题
+
+**Q: 如何在OpenClaw中使用这个skill？**  
+A: 运行 `install_skill.ps1` 脚本安装，然后重启Trae IDE，在AI助手中直接输入搜索条件即可。
 
 **Q: 搜索返回"暂时无法访问"？**  
 A: 可能是网络问题或请求过于频繁，请稍后重试。
@@ -198,6 +256,9 @@ A: 尝试放宽搜索条件，如扩大时间范围、更换关键词等。
 
 **Q: 如何添加更多城市支持？**  
 A: 在 `utils.py` 的 `LOCATION_MAPPING` 中添加城市名称和对应的代码。
+
+**Q: 安装后AI助手没有调用skill？**  
+A: 请确保：1) 安装脚本执行成功；2) 已重启Trae IDE；3) `~\.trae\skills.json` 文件配置正确。
 
 ## 许可证
 
